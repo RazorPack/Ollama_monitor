@@ -1,9 +1,9 @@
 
 #!/usr/bin/env python3
 """
-Мониторинг сервиса Ollama
-Проверяет доступность сервиса, API, загруженность моделей и отправляет уведомления при проблемах
-Веб-интерфейс для просмотра графиков в браузере
+Ollama Service Monitoring
+Checks service availability, API, model load and sends notifications when problems occur
+Web interface for viewing graphs in browser
 """
 
 import requests
@@ -22,20 +22,20 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
-matplotlib.use('Agg')  # Безголовый режим для сервера
+matplotlib.use('Agg')  # Headless mode for server
 
-# Конфигурация
+# Configuration
 CONFIG = {
     "ollama_host": "http://localhost:11434",
-    "check_interval": 60,  # секунды
-    "timeout": 10,  # таймаут запроса в секундах
+    "check_interval": 60,  # seconds
+    "timeout": 10,  # request timeout in seconds
     "history_file": "ollama_history.json",
     "graph_dir": "graphs",
     "web_port": 8080,
     "web_host": "0.0.0.0",
     "graph_width": 12,
     "graph_height": 6,
-    "history_hours": 24,  # хранить историю за 24 часа
+    "history_hours": 24,  # store history for 24 hours
     "email": {
         "enabled": False,
         "smtp_server": "smtp.example.com",
@@ -56,9 +56,9 @@ CONFIG = {
 
 @dataclass
 class ModelInfo:
-    """Информация о модели"""
+    """Model information"""
     name: str
-    size: int  # в байтах
+    size: int  # in bytes
     modified_at: str
     digest: str
     
@@ -73,10 +73,10 @@ class ModelInfo:
 
 @dataclass
 class RunningModel:
-    """Загруженная/активная модель"""
+    """Loaded/active model"""
     model: str
     digest: str
-    duration: int  # наносекунды
+    duration: int  # nanoseconds
     done: bool
     
     @property
@@ -90,7 +90,7 @@ class RunningModel:
 
 @dataclass
 class MetricPoint:
-    """Точка метрики для графика"""
+    """Metric point for chart"""
     timestamp: str
     response_time: float
     models_loaded: int
@@ -102,7 +102,7 @@ class MetricPoint:
 
 @dataclass
 class OllamaStatus:
-    """Статус сервиса Ollama"""
+    """Ollama service status"""
     service_running: bool
     api_reachable: bool
     models_available: int
@@ -116,7 +116,7 @@ class OllamaStatus:
 
 
 class HistoryManager:
-    """Управление историей метрик"""
+    """Metrics history management"""
     
     def __init__(self, config: dict):
         self.config = config
@@ -126,7 +126,7 @@ class HistoryManager:
         self._load_history()
     
     def _load_history(self):
-        """Загрузка истории из файла"""
+        """Load history from file"""
         if os.path.exists(self.history_file):
             try:
                 with open(self.history_file, 'r') as f:
@@ -137,13 +137,13 @@ class HistoryManager:
                 self.metrics = []
     
     def _cleanup_old(self):
-        """Удаление старых записей"""
+        """Delete old records"""
         cutoff = datetime.now() - timedelta(hours=self.history_hours)
         cutoff_str = cutoff.isoformat()
         self.metrics = [m for m in self.metrics if m.timestamp >= cutoff_str]
     
     def _save_history(self):
-        """Сохранение истории в файл"""
+        """Save history to file"""
         try:
             with open(self.history_file, 'w') as f:
                 json.dump([asdict(m) for m in self.metrics], f)
@@ -151,7 +151,7 @@ class HistoryManager:
             pass
     
     def add_metric(self, status: OllamaStatus):
-        """Добавление новой метрики"""
+        """Add new metric"""
         metric = MetricPoint(
             timestamp=datetime.now().isoformat(),
             response_time=status.response_time,
@@ -166,7 +166,7 @@ class HistoryManager:
         self._save_history()
     
     def get_history_data(self) -> Dict[str, List]:
-        """Получение данных для графиков"""
+        """Get data for charts"""
         timestamps = []
         response_times = []
         models_loaded = []
@@ -186,7 +186,7 @@ class HistoryManager:
         }
     
     def get_latest_status(self) -> Dict[str, Any]:
-        """Получение последнего статуса для отображения"""
+        """Get latest status for display"""
         if not self.metrics:
             return {
                 'service_up': False,
@@ -210,7 +210,7 @@ class HistoryManager:
 
 
 class GraphGenerator:
-    """Генерация графиков"""
+    """Graph generation"""
     
     def __init__(self, config: dict):
         self.config = config
@@ -218,7 +218,7 @@ class GraphGenerator:
         os.makedirs(self.graph_dir, exist_ok=True)
     
     def generate_all(self, history: HistoryManager):
-        """Генерация всех графиков"""
+        """Generate all graphs"""
         data = history.get_history_data()
         
         if not data['timestamps']:
@@ -230,25 +230,25 @@ class GraphGenerator:
         self._generate_combined_graph(data)
     
     def _setup_figure(self):
-        """Настройка фигуры"""
+        """Setup figure"""
         width = self.config.get("graph_width", 12)
         height = self.config.get("graph_height", 6)
         return plt.figure(figsize=(width, height))
     
     def _format_time_axis(self, ax):
-        """Форматирование оси времени"""
+        """Time axis formatting"""
         ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
         ax.xaxis.set_major_locator(mdates.AutoDateLocator())
         plt.setp(ax.xaxis.get_majorticklabels(), rotation=45, ha='right')
     
     def _generate_response_time_graph(self, data: Dict[str, List]):
-        """График времени отклика"""
+        """Response time graph"""
         fig = self._setup_figure()
         
         plt.plot(data['timestamps'], data['response_time'], 
-                 color='#2196F3', linewidth=2, label='Время отклика (сек)')
+                 color='#2196F3', linewidth=2, label='Response time (sec)')
         
-        # Добавляем скользящее среднее
+        # Add moving average
         if len(data['response_time']) > 5:
             import numpy as np
             window = min(5, len(data['response_time']))
@@ -256,11 +256,11 @@ class GraphGenerator:
                                    np.ones(window)/window, mode='valid')
             plt.plot(data['timestamps'][:len(rolling)], rolling,
                     color='#FF5722', linewidth=2, linestyle='--', 
-                    label=f'Среднее (окно={window})')
+                    label=f'Average (window={window})')
         
-        plt.xlabel('Время')
-        plt.ylabel('Время отклика (сек)')
-        plt.title('📈 Время отклика Ollama')
+        plt.xlabel('Time')
+        plt.ylabel('Response time (sec)')
+        plt.title('📈 Ollama response time')
         plt.grid(True, alpha=0.3)
         plt.legend()
         self._format_time_axis(plt.gca())
@@ -270,19 +270,19 @@ class GraphGenerator:
         plt.close()
     
     def _generate_models_graph(self, data: Dict[str, List]):
-        """График загруженных моделей"""
+        """Loaded models graph"""
         fig = self._setup_figure()
         
         plt.plot(data['timestamps'], data['models_loaded'],
                  color='#4CAF50', linewidth=2, marker='o', markersize=3,
-                 label='Загружено моделей')
+                 label='Models loaded')
         
         plt.fill_between(data['timestamps'], data['models_loaded'], 
                          alpha=0.3, color='#4CAF50')
         
-        plt.xlabel('Время')
-        plt.ylabel('Количество моделей')
-        plt.title('🧠 Загруженные модели')
+        plt.xlabel('Time')
+        plt.ylabel('Number of models')
+        plt.title('🧠 Loaded models')
         plt.grid(True, alpha=0.3)
         plt.legend()
         self._format_time_axis(plt.gca())
@@ -292,18 +292,18 @@ class GraphGenerator:
         plt.close()
     
     def _generate_memory_graph(self, data: Dict[str, List]):
-        """График использования памяти"""
+        """Memory usage graph"""
         fig = self._setup_figure()
         
         plt.plot(data['timestamps'], data['memory_percent'],
-                 color='#9C27B0', linewidth=2, label='Память системы (%)')
+                 color='#9C27B0', linewidth=2, label='System memory (%)')
         
         plt.fill_between(data['timestamps'], data['memory_percent'],
                          alpha=0.3, color='#9C27B0')
         
-        plt.xlabel('Время')
-        plt.ylabel('Использование (%)')
-        plt.title('💾 Использование памяти')
+        plt.xlabel('Time')
+        plt.ylabel('Usage (%)')
+        plt.title('💾 Memory usage')
         plt.ylim(0, 100)
         plt.grid(True, alpha=0.3)
         plt.legend()
@@ -314,27 +314,27 @@ class GraphGenerator:
         plt.close()
     
     def _generate_combined_graph(self, data: Dict[str, List]):
-        """Комбинированный график"""
+        """Combined graph"""
         fig, axes = plt.subplots(2, 1, figsize=(14, 10))
         
-        # Время отклика
+        # Response time
         axes[0].plot(data['timestamps'], data['response_time'],
-                     color='#2196F3', linewidth=2, label='Время отклика (сек)')
-        axes[0].set_xlabel('Время')
-        axes[0].set_ylabel('Время отклика (сек)')
-        axes[0].set_title('⏱ Время отклика и загрузка моделей')
+                     color='#2196F3', linewidth=2, label='Response time (sec)')
+        axes[0].set_xlabel('Time')
+        axes[0].set_ylabel('Response time (sec)')
+        axes[0].set_title('⏱ Response time and model loading')
         axes[0].grid(True, alpha=0.3)
         axes[0].legend()
         self._format_time_axis(axes[0])
         
-        # Модели
+        # Models
         axes[1].plot(data['timestamps'], data['models_loaded'],
                      color='#4CAF50', linewidth=2, marker='o', markersize=3,
-                     label='Загружено моделей')
+                     label='Models loaded')
         axes[1].fill_between(data['timestamps'], data['models_loaded'],
                               alpha=0.3, color='#4CAF50')
-        axes[1].set_xlabel('Время')
-        axes[1].set_ylabel('Количество моделей')
+        axes[1].set_xlabel('Time')
+        axes[1].set_ylabel('Number of models')
         axes[1].grid(True, alpha=0.3)
         axes[1].legend()
         self._format_time_axis(axes[1])
@@ -345,7 +345,7 @@ class GraphGenerator:
 
 
 class WebServer:
-    """Веб-сервер для отображения графиков"""
+    """Web server for displaying graphs"""
     
     HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="ru">
@@ -487,62 +487,62 @@ class WebServer:
     <div class="container">
         <header>
             <h1>📊 Ollama Monitor</h1>
-            <p>Мониторинг сервиса Ollama</p>
+            <p>Ollama service monitoring</p>
         </header>
         
         <div class="status-bar">
             <div class="status-card {{'up' if status.service_up else 'down'}}">
-                <div class="label">Статус</div>
-                <div class="value">{{'✅ Работает' if status.service_up else '❌ Недоступен'}}</div>
+                <div class="label">Status</div>
+                <div class="value">{{'✅ Running' if status.service_up else '❌ Unavailable'}}</div>
             </div>
             <div class="status-card">
-                <div class="label">Время отклика</div>
+                <div class="label">Response time</div>
                 <div class="value">{{"%.3f"|format(status.response_time)}}</div>
-                <div class="unit">сек</div>
+                <div class="unit">sec</div>
             </div>
             <div class="status-card">
-                <div class="label">Моделей доступно</div>
+                <div class="label">Available models</div>
                 <div class="value">{{status.models_available}}</div>
             </div>
             <div class="status-card">
-                <div class="label">Моделей загружено</div>
+                <div class="label">Loaded models</div>
                 <div class="value">{{status.models_loaded}}</div>
             </div>
             <div class="status-card">
-                <div class="label">Память системы</div>
+                <div class="label">System memory</div>
                 <div class="value">{{"%.1f"|format(status.memory_percent)}}</div>
                 <div class="unit">%</div>
             </div>
             <div class="status-card">
-                <div class="label">Память Ollama</div>
+                <div class="label">Ollama memory</div>
                 <div class="value">{{"%.0f"|format(status.ollama_memory_mb)}}</div>
                 <div class="unit">MB</div>
             </div>
         </div>
         
-        <p class="refresh-info">Страница обновляется автоматически каждые 30 секунд</p>
+        <p class="refresh-info">Page refreshes automatically every 30 seconds</p>
         
         <div class="grid">
             <div class="graph-card">
-                <h3>📈 Время отклика</h3>
-                <img src="/graphs/combined.png?t={{cache_bust}}" alt="Время отклика">
+                <h3>📈 Response time</h3>
+                <img src="/graphs/combined.png?t={{cache_bust}}" alt="Response time">
             </div>
             <div class="graph-card">
-                <h3>🧠 Загруженные модели</h3>
-                <img src="/graphs/models_loaded.png?t={{cache_bust}}" alt="Загруженные модели">
+                <h3>🧠 Loaded models</h3>
+                <img src="/graphs/models_loaded.png?t={{cache_bust}}" alt="Loaded models">
             </div>
             <div class="graph-card">
-                <h3>💾 Использование памяти</h3>
-                <img src="/graphs/memory.png?t={{cache_bust}}" alt="Память">
+                <h3>💾 Memory usage</h3>
+                <img src="/graphs/memory.png?t={{cache_bust}}" alt="Memory">
             </div>
             <div class="graph-card">
-                <h3>📊 Общая статистика</h3>
-                <img src="/graphs/combined.png?t={{cache_bust}}" alt="Статистика">
+                <h3>📊 Overall statistics</h3>
+                <img src="/graphs/combined.png?t={{cache_bust}}" alt="Statistics">
             </div>
         </div>
         
         <div class="footer">
-            <p>Ollama Monitor • Обновлено: {{status.last_update}}</p>
+            <p>Ollama Monitor • Updated: {{status.last_update}}</p>
         </div>
     </div>
 </body>
@@ -557,7 +557,7 @@ class WebServer:
         self._server = None
     
     def _generate_html(self) -> str:
-        """Генерация HTML страницы"""
+        """Generate HTML page"""
         status = self.history.get_latest_status()
         cache_bust = int(time.time())
         
@@ -574,7 +574,7 @@ class WebServer:
         return html
     
     def start(self):
-        """Запуск веб-сервера"""
+        """Start web server"""
         from http.server import HTTPServer, SimpleHTTPRequestHandler
         import socketserver
         
@@ -590,7 +590,7 @@ class WebServer:
                     html = web_server._generate_html()
                     self.wfile.write(html.encode('utf-8'))
                 elif self.path.startswith('/graphs/'):
-                    # Проксирование графиков из graph_dir
+                    # Proxy graphs from graph_dir
                     graph_path = self.path.lstrip('/')
                     full_path = os.path.join(os.getcwd(), graph_path)
                     if os.path.exists(full_path) and os.path.isfile(full_path):
@@ -607,19 +607,19 @@ class WebServer:
                     self.send_error(404)
             
             def log_message(self, format, *args):
-                pass  # Отключаем логирование HTTP
+                pass  # Disable HTTP logging
         
         self._server = HTTPServer((self.host, self.port), Handler)
-        print(f"🌐 Веб-интерфейс доступен по адресу: http://localhost:{self.port}")
+        print(f"🌐 Web interface available at: http://localhost:{self.port}")
         self._server.serve_forever()
     
     def stop(self):
-        """Остановка веб-сервера"""
+        """Stop web server"""
         if self._server:
             self._server.shutdown()
 
 
-# Глобальная ссылка для Handler
+# Global reference for Handler
 web_server = None
 
 
@@ -629,11 +629,11 @@ class OllamaMonitor:
         self.last_status: Optional[OllamaStatus] = None
         self.was_down = False
         
-        # Инициализация менеджеров
+        # Initialize managers
         self.history = HistoryManager(config)
         self.graphs = GraphGenerator(config)
         
-        # Настройка логирования
+        # Configure logging
         logging.basicConfig(
             level=logging.INFO,
             format="%(asctime)s - %(levelname)s - %(message)s",
@@ -645,10 +645,10 @@ class OllamaMonitor:
         self.logger = logging.getLogger(__name__)
 
     def get_system_memory_info(self) -> tuple:
-        """Получение информации о памяти системы"""
+        """Get system memory information"""
         try:
             memory = psutil.virtual_memory()
-            # Ищем процесс ollama
+            # Find ollama process
             ollama_memory = 0
             for proc in psutil.process_iter(['name', 'memory_info']):
                 try:
@@ -661,11 +661,11 @@ class OllamaMonitor:
             return 0.0, 0.0
 
     def check_service(self) -> OllamaStatus:
-        """Проверка доступности сервиса Ollama"""
+        """Check Ollama service availability"""
         start_time = time.time()
         
         try:
-            # Проверка базового адреса
+            # Check base address
             response = requests.get(
                 f"{self.config['ollama_host']}/",
                 timeout=self.config["timeout"]
@@ -673,13 +673,13 @@ class OllamaMonitor:
             response_time = time.time() - start_time
             
             if response.status_code == 200:
-                # Получаем список моделей
+                # Get list of models
                 models_response = requests.get(
                     f"{self.config['ollama_host']}/api/tags",
                     timeout=self.config["timeout"]
                 )
                 
-                # Получаем текущие задачи/модели
+                # Get current tasks/models
                 ps_response = requests.get(
                     f"{self.config['ollama_host']}/api/ps",
                     timeout=self.config["timeout"]
@@ -702,7 +702,7 @@ class OllamaMonitor:
                         models.append(model_info)
                         total_size += model_info.size
                 
-                # Парсим текущие задачи
+                # Parse current tasks
                 if ps_response.status_code == 200:
                     ps_data = ps_response.json()
                     loaded_model = ps_data.get("model")
@@ -765,7 +765,7 @@ class OllamaMonitor:
             )
 
     def send_telegram_alert(self, message: str):
-        """Отправка уведомления в Telegram"""
+        """Send notification to Telegram"""
         if not self.config["telegram"]["enabled"]:
             return
             
@@ -782,7 +782,7 @@ class OllamaMonitor:
             self.logger.error(f"Failed to send Telegram alert: {e}")
 
     def send_email_alert(self, subject: str, body: str):
-        """Отправка email уведомления"""
+        """Send email notification"""
         if not self.config["email"]["enabled"]:
             return
             
@@ -806,13 +806,13 @@ class OllamaMonitor:
             self.logger.error(f"Failed to send email alert: {e}")
 
     def send_alert(self, status: OllamaStatus):
-        """Отправка уведомлений о проблемах"""
+        """Send problem notifications"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        message = f"🔴 <b>Ollama недоступен!</b>\n\n"
-        message += f"⏰ Время: {timestamp}\n"
-        message += f"❌ Ошибка: {status.error_message}\n"
-        message += f"⏱ Время отклика: {status.response_time:.2f}с"
+        message = f"🔴 <b>Ollama unavailable!</b>\n\n"
+        message += f"⏰ Time: {timestamp}\n"
+        message += f"❌ Error: {status.error_message}\n"
+        message += f"⏱ Response time: {status.response_time:.2f}s"
         
         self.logger.warning(f"Ollama is DOWN: {status.error_message}")
         
@@ -820,11 +820,11 @@ class OllamaMonitor:
         self.send_email_alert("🚨 Ollama Alert!", message.replace("<b>", "").replace("</b>", ""))
 
     def send_recovery_alert(self):
-        """Отправка уведомления о восстановлении"""
+        """Send recovery notification"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        message = f"✅ <b>Ollama восстановлен!</b>\n\n"
-        message += f"⏰ Время: {timestamp}"
+        message = f"✅ <b>Ollama recovered!</b>\n\n"
+        message += f"⏰ Time: {timestamp}"
         
         self.logger.info("Ollama is back UP")
         
@@ -832,42 +832,42 @@ class OllamaMonitor:
         self.send_email_alert("✅ Ollama Recovered!", message.replace("<b>", "").replace("</b>", ""))
 
     def log_status(self, status: OllamaStatus):
-        """Логирование статуса"""
+        """Log status"""
         if status.service_running:
             loaded_info = ""
             if status.models_loaded:
-                loaded_info = f" | Загружены: {', '.join(status.models_loaded)}"
+                loaded_info = f" | Loaded: {', '.join(status.models_loaded)}"
             
             tasks_info = ""
             if status.running_tasks:
                 active_tasks = [t.model for t in status.running_tasks if not t.done]
                 if active_tasks:
-                    tasks_info = f" | Задачи: {', '.join(set(active_tasks))}"
+                    tasks_info = f" | Tasks: {', '.join(set(active_tasks))}"
             
             self.logger.info(
-                f"✓ Ollama работает | "
-                f"Моделей: {status.models_available} | "
-                f"Размер: {status.total_models_size_gb:.2f} GB | "
-                f"Память: {status.system_memory_percent:.1f}%{loaded_info}{tasks_info} | "
-                f"Отклик: {status.response_time:.2f}с"
+                f"✓ Ollama is running | "
+                f"Models: {status.models_available} | "
+                f"Size: {status.total_models_size_gb:.2f} GB | "
+                f"Memory: {status.system_memory_percent:.1f}%{loaded_info}{tasks_info} | "
+                f"Response: {status.response_time:.2f}s"
             )
         else:
             self.logger.error(
-                f"✗ Ollama недоступен | Ошибка: {status.error_message}"
+                f"✗ Ollama unavailable | Error: {status.error_message}"
             )
 
     def run(self):
-        """Запуск мониторинга"""
+        """Start monitoring"""
         global web_server
         
         self.logger.info("=" * 60)
-        self.logger.info("Запуск мониторинга Ollama")
-        self.logger.info(f"Интервал проверки: {self.config['check_interval']} сек")
-        self.logger.info(f"Директория графиков: {self.config['graph_dir']}")
-        self.logger.info(f"Веб-интерфейс: http://localhost:{self.config['web_port']}")
+        self.logger.info("Starting Ollama monitoring")
+        self.logger.info(f"Check interval: {self.config['check_interval']} sec")
+        self.logger.info(f"Graph directory: {self.config['graph_dir']}")
+        self.logger.info(f"Web interface: http://localhost:{self.config['web_port']}")
         self.logger.info("=" * 60)
         
-        # Запуск веб-сервера в отдельном потоке
+        # Start web server in separate thread
         web_server = WebServer(self.config, self.history)
         web_thread = threading.Thread(target=web_server.start, daemon=True)
         web_thread.start()
@@ -878,17 +878,17 @@ class OllamaMonitor:
             status = self.check_service()
             self.log_status(status)
             
-            # Сохраняем метрику в историю
+            # Save metric to history
             self.history.add_metric(status)
             
-            # Генерируем графики каждые 5 проверок
+            # Generate graphs every 5 checks
             check_count += 1
             if check_count >= 5:
                 self.graphs.generate_all(self.history)
-                self.logger.info("📊 Графики обновлены")
+                self.logger.info("📊 Graphs updated")
                 check_count = 0
             
-            # Отправка уведомлений при изменении статуса
+            # Send notifications when status changes
             if not status.service_running and not self.was_down:
                 self.was_down = True
                 self.send_alert(status)
@@ -901,55 +901,55 @@ class OllamaMonitor:
 
 
 def quick_check():
-    """Быстрая проверка без запуска цикла"""
+    """Quick check without running the loop"""
     config = CONFIG.copy()
     monitor = OllamaMonitor(config)
     status = monitor.check_service()
     
-    # Сохраняем метрику
+    # Save metric
     monitor.history.add_metric(status)
     
-    # Генерируем графики
+    # Generate graphs
     monitor.graphs.generate_all(monitor.history)
     
     print("\n" + "=" * 50)
-    print("📊 Проверка статуса Ollama")
+    print("📊 Ollama Status Check")
     print("=" * 50)
     
     if status.service_running:
-        print(f"✅ Сервис: Работает")
-        print(f"✅ API: Доступен")
-        print(f"📦 Доступно моделей: {status.models_available}")
-        print(f"💾 Общий размер моделей: {status.total_models_size_gb:.2f} GB")
-        print(f"🧠 Память системы: {status.system_memory_percent:.1f}%")
-        print(f"🐳 Память Ollama: {status.ollama_memory_mb:.1f} MB")
+        print(f"✅ Service: Running")
+        print(f"✅ API: Available")
+        print(f"📦 Available models: {status.models_available}")
+        print(f"💾 Total model size: {status.total_models_size_gb:.2f} GB")
+        print(f"🧠 System memory: {status.system_memory_percent:.1f}%")
+        print(f"🐳 Ollama memory: {status.ollama_memory_mb:.1f} MB")
         
         if status.models_loaded:
-            print(f"\n📌 Загруженные модели:")
+            print(f"\n📌 Loaded models:")
             for model in status.models_loaded:
                 print(f"   • {model}")
         else:
-            print(f"\n📌 Загруженные модели: нет")
+            print(f"\n📌 Loaded models: none")
         
         if status.running_tasks:
             active_tasks = [t for t in status.running_tasks if not t.done]
             if active_tasks:
-                print(f"\n🔄 Активные задачи:")
+                print(f"\n🔄 Active tasks:")
                 for task in active_tasks:
-                    print(f"   • {task.model} ({task.duration_sec:.1f} сек)")
+                    print(f"   • {task.model} ({task.duration_sec:.1f} sec)")
         
-        print(f"\n⏱ Время отклика: {status.response_time:.3f} сек")
+        print(f"\n⏱ Response time: {status.response_time:.3f} sec")
         
-        print(f"\n📈 Графики сохранены в директорию: {config['graph_dir']}/")
-        print(f"   • response_time.png - время отклика")
-        print(f"   • models_loaded.png - загруженные модели")
-        print(f"   • memory.png - использование памяти")
-        print(f"   • combined.png - комбинированный график")
+        print(f"\n📈 Graphs saved to directory: {config['graph_dir']}/")
+        print(f"   • response_time.png - response time")
+        print(f"   • models_loaded.png - loaded models")
+        print(f"   • memory.png - memory usage")
+        print(f"   • combined.png - combined graph")
         
-        print(f"\n🌐 Веб-интерфейс: http://localhost:{config['web_port']}")
+        print(f"\n🌐 Web interface: http://localhost:{config['web_port']}")
     else:
-        print(f"❌ Сервис: Недоступен")
-        print(f"❌ Ошибка: {status.error_message}")
+        print(f"❌ Service: Unavailable")
+        print(f"❌ Error: {status.error_message}")
     
     print("=" * 50 + "\n")
     return status.service_running
@@ -961,12 +961,12 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--check":
         quick_check()
     elif len(sys.argv) > 1 and sys.argv[1] == "--web":
-        # Только веб-сервер
+        # Web server only
         config = CONFIG.copy()
         history = HistoryManager(config)
         graphs = GraphGenerator(config)
         
-        print(f"Запуск веб-сервера на порту {config['web_port']}...")
+        print(f"Starting web server on port {config['web_port']}...")
         web_server = WebServer(config, history)
         web_server.start()
     else:
